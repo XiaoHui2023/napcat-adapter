@@ -2,11 +2,10 @@ import argparse
 import asyncio
 
 from log import setup_logging, setup_log_filter
-from core import Bot, onebot_to_bot, bot_to_onebot
+from core import Bot, BotMessage, onebot_to_bot, bot_to_onebot
 from settings import load_settings, settings
 from onebot_protocol import MessagePayload
 from patch_jack import Jack, LoggingJackListener
-from models import BotMessage
 
 
 def parse_args() -> argparse.Namespace:

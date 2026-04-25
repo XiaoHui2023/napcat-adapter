@@ -6,5 +6,5 @@ if not exist .venv (
 )
 
 call .venv\Scripts\activate.bat
-python src
+python src config.yaml
 pause

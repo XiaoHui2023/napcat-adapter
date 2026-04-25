@@ -1,5 +1,5 @@
 from typing import List, Union, Optional
-from models import (
+from core.models import (
     BaseSegment,
     TextSegment,
     ImageSegment,
@@ -115,6 +115,9 @@ def bot_to_onebot(msg: BotMessage) -> Optional[MessagePayload]:
         else:
             continue
         messages.append(message)
+
+    if not messages:
+        return None
 
     return MessagePayload(
         message_id=msg.message_id,

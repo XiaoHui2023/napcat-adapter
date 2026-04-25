@@ -8,7 +8,7 @@ from napcat import GroupMessageEvent, NapCatClient, PrivateMessageEvent
 from napcat.types.messages import Message, MessageSegment, UnknownMessageSegment
 from pydantic import BaseModel, Field, PrivateAttr
 
-from models import BotMessage, MessageType
+from core.models import BotMessage, MessageType
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +51,17 @@ class Bot(BaseModel):
         """
         self._on_message = callback
 
-    async def _get_login_info(self) -> None:
-        """刷新机器人登录信息，供消息转换与日志使用。"""
+    async def _refresh_login_info(self) -> None:
+        """按 NapCat 登录信息接口刷新机器人基础信息。"""
         if self._client is None:
             return
         try:
-            self._login_info = await self._client.get_login_info()
-            self._bot_name = str(self._login_info["nickname"])
-            self._bot_id = str(self._login_info["user_id"])
+            login_info = await self._client.get_login_info()
+            user_id = int(login_info["user_id"])
+            self._client.self_id = user_id
+            self._login_info = dict(login_info)
+            self._bot_id = str(user_id)
+            self._bot_name = str(login_info["nickname"])
             logging.info("机器人登录: %s (%s)", self._bot_name, self._bot_id)
         except Exception:
             logging.exception("获取登录信息失败")
@@ -70,7 +73,7 @@ class Bot(BaseModel):
 
         try:
             async with self._client:
-                await self._get_login_info()
+                await self._refresh_login_info()
                 async for event in self._client:
                     if self._stop_event.is_set():
                         break
@@ -87,7 +90,7 @@ class Bot(BaseModel):
     async def _handle_message(self, event: GroupMessageEvent | PrivateMessageEvent) -> None:
         """把 NapCat 消息事件转换成网关侧统一消息。"""
         if self._login_info is None:
-            await self._get_login_info()
+            await self._refresh_login_info()
 
         user_name = str(event.user_id)
         session_id = str(event.group_id) if isinstance(event, GroupMessageEvent) else user_name
