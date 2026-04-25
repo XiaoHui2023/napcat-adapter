@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "napcat-adapter"
+version = "0.0.0"
+description = "Napcat 对接"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+    "python-dotenv==1.2.1",
+    "PyYAML",
+    "napcat-sdk",
+    "onebot-protocol",
+    "pydantic-settings",
+    "rich",
+    "python-library-patch-jack==0.1.1",
+]
