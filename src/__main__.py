@@ -32,7 +32,11 @@ async def main() -> None:
     setup_logging(log_dir=settings.log_dir, level=settings.log_level)
     setup_log_filter()
 
-    bot = Bot(ws_url=settings.napcat_ws_url, token=settings.napcat_token)
+    bot = Bot(
+        ws_url=settings.napcat_ws_url,
+        token=settings.napcat_token,
+        reconnect_interval_seconds=settings.napcat_reconnect_interval_seconds,
+    )
     jack = Jack(port=settings.server_port, listeners=[LoggingJackListener()])
 
     @jack

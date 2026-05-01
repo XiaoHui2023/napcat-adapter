@@ -19,6 +19,12 @@ class Bot(BaseModel):
     ws_url: str = Field(description="NapCat 正向 WebSocket 地址")
     token: str | None = Field(default=None, description="NapCat 访问令牌")
     max_event_cache: int = Field(default=100, description="最大事件缓存数量")
+    reconnect_interval_seconds: float = Field(
+        default=5.0,
+        ge=0.5,
+        le=3600.0,
+        description="断线或连接失败后再次尝试前的等待秒数",
+    )
 
     _stop_event: asyncio.Event = PrivateAttr()
     _task: asyncio.Task[None] | None = PrivateAttr(default=None)
@@ -67,25 +73,53 @@ class Bot(BaseModel):
             logging.exception("获取登录信息失败")
 
     async def _handle_events(self) -> None:
-        """连接 NapCat 并持续消费消息事件。"""
-        self._client = NapCatClient(ws_url=self.ws_url, token=self.token)
-        logger.info("正在连接 NapCat: %s", self.ws_url)
-
+        """连接 NapCat 并持续消费消息事件；断线或失败后按间隔自动重连。"""
         try:
-            async with self._client:
-                await self._refresh_login_info()
-                async for event in self._client:
-                    if self._stop_event.is_set():
-                        break
-                    if isinstance(event, (GroupMessageEvent, PrivateMessageEvent)):
-                        await self._handle_message(event)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("NapCat 事件循环异常")
+            while not self._stop_event.is_set():
+                self._client = NapCatClient(ws_url=self.ws_url, token=self.token)
+                logger.info("正在连接 NapCat: %s", self.ws_url)
+
+                try:
+                    async with self._client:
+                        await self._refresh_login_info()
+                        async for event in self._client:
+                            if self._stop_event.is_set():
+                                break
+                            if isinstance(event, (GroupMessageEvent, PrivateMessageEvent)):
+                                await self._handle_message(event)
+                except asyncio.CancelledError:
+                    raise
+                except ConnectionRefusedError:
+                    logger.error(
+                        "无法连接 NapCat（目标拒绝连接）: %s。请确认 NapCat 已运行，"
+                        "且配置的 WebSocket 地址与 NapCat 正向 WebSocket 监听地址、端口一致。",
+                        self.ws_url,
+                    )
+                except Exception:
+                    logger.exception("NapCat 事件循环异常")
+                finally:
+                    self._client = None
+                    self._login_info = None
+                    self._bot_id = ""
+                    self._bot_name = ""
+
+                if self._stop_event.is_set():
+                    break
+
+                logger.info(
+                    "%.1f 秒后重试连接 NapCat...",
+                    self.reconnect_interval_seconds,
+                )
+                try:
+                    await asyncio.wait_for(
+                        self._stop_event.wait(),
+                        timeout=self.reconnect_interval_seconds,
+                    )
+                    break
+                except TimeoutError:
+                    continue
         finally:
             self._running = False
-            self._client = None
 
     async def _handle_message(self, event: GroupMessageEvent | PrivateMessageEvent) -> None:
         """把 NapCat 消息事件转换成网关侧统一消息。"""

@@ -31,6 +31,12 @@ class Settings(BaseSettings):
 
     napcat_ws_url: str = Field(description="NapCat 正向 WebSocket 地址")
     napcat_token: str | None = Field(default=None, description="NapCat 访问令牌")
+    napcat_reconnect_interval_seconds: float = Field(
+        default=5.0,
+        ge=0.5,
+        le=3600.0,
+        description="NapCat 断线或连接失败后的重连等待秒数",
+    )
     server_port: int = Field(default=8080, description="网关服务端口")
     log_level: Literal["info", "debug", "warning", "error", "critical"] = Field(
         default="info", description="日志级别"
